@@ -20,6 +20,10 @@ type ShoppingListPatch struct {
 	Items []string `json:"items"`
 }
 
+type ListPushAction struct {
+	Item string `json:"item"`
+}
+
 func main() {
 	http.HandleFunc("POST /v1/lists", handleCreateList)
 	http.HandleFunc("GET /v1/lists", handleListLists)
@@ -27,6 +31,7 @@ func main() {
 	http.HandleFunc("PUT /v1/lists/{id}", handleUpdateList)
 	http.HandleFunc("PATCH /v1/lists/{id}", handlePatchList)
 	http.HandleFunc("GET /v1/lists/{id}", handleGetList)
+	http.HandleFunc("POST /v1/lists/{id}/push", handleListPush)
 	fmt.Println("listening on port :8888")
 	http.ListenAndServe(":8888", nil)
 }
@@ -131,6 +136,29 @@ func handleGetList(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			_, err = w.Write(data)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			return
+		}
+	}
+	http.Error(w, "List not found", http.StatusNotFound)
+}
+
+func handleListPush(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	for i, list := range allData {
+		if strconv.Itoa(list.ID) == id {
+			var item ListPushAction
+			err := json.NewDecoder(r.Body).Decode(&item)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			list.Items = append(list.Items, item.Item)
+			allData[i] = list
+			err = json.NewEncoder(w).Encode(list)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
