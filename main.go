@@ -50,13 +50,13 @@ var allUsers = map[string]*User{
 }
 
 func main() {
-	http.HandleFunc("POST /v1/lists", authRequired(handleCreateList))
+	http.HandleFunc("POST /v1/lists", adminRequired(handleCreateList))
 	http.HandleFunc("GET /v1/lists", authRequired(handleListLists))
-	http.HandleFunc("DELETE /v1/lists/{id}", authRequired(handleDeleteList))
-	http.HandleFunc("PUT /v1/lists/{id}", authRequired(handleUpdateList))
-	http.HandleFunc("PATCH /v1/lists/{id}", authRequired(handlePatchList))
+	http.HandleFunc("DELETE /v1/lists/{id}", adminRequired(handleDeleteList))
+	http.HandleFunc("PUT /v1/lists/{id}", adminRequired(handleUpdateList))
+	http.HandleFunc("PATCH /v1/lists/{id}", adminRequired(handlePatchList))
 	http.HandleFunc("GET /v1/lists/{id}", authRequired(handleGetList))
-	http.HandleFunc("POST /v1/lists/{id}/push", authRequired(handleListPush))
+	http.HandleFunc("POST /v1/lists/{id}/push", adminRequired(handleListPush))
 	http.HandleFunc("POST /login", handleLogin)
 	fmt.Println("listening on port :8888")
 	http.ListenAndServe(":8888", nil)
@@ -243,4 +243,17 @@ func authRequired(next http.HandlerFunc) http.HandlerFunc {
 		}
 		next(w, r)
 	}
+}
+
+func adminRequired(next http.HandlerFunc) http.HandlerFunc {
+	return authRequired(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Header.Get("Authorization")
+		token = token[7:]
+		user := allUsers[sessions[token].Username]
+		if user.Role != "admin" {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next(w, r)
+	})
 }
