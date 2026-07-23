@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,7 @@ type User struct {
 }
 
 type Session struct {
+	Token    string
 	Expires  time.Time
 	Username string
 }
@@ -49,7 +51,20 @@ var allUsers = map[string]*User{
 	"user":  {"user", "user", "password"},
 }
 
+var repository *Repository
+
 func main() {
+	var err error
+	repository, err = NewRepository("./database.db")
+	if err != nil {
+		fmt.Println("Unable to open the database:", err.Error())
+		os.Exit(1)
+	}
+	if err := repository.Init(); err != nil {
+		fmt.Println("Unable to initialize the database:", err.Error())
+		os.Exit(1)
+	}
+
 	http.HandleFunc("POST /v1/lists", adminRequired(handleCreateList))
 	http.HandleFunc("GET /v1/lists", authRequired(handleListLists))
 	http.HandleFunc("DELETE /v1/lists/{id}", adminRequired(handleDeleteList))
@@ -228,16 +243,8 @@ func authRequired(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		token = token[7:]
-		if sessions[token] == nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		if sessions[token].Expires.Before(time.Now()) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		user := allUsers[sessions[token].Username]
-		if user == nil {
+		_, err := repository.GetSession(token)
+		if err == nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
