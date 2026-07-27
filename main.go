@@ -130,51 +130,51 @@ func handleDeleteList(w http.ResponseWriter, r *http.Request) {
 
 func handleUpdateList(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	for i, list := range allData {
-		if strconv.Itoa(list.ID) == id {
-			var updatedList ShoppingList
-			err := json.NewDecoder(r.Body).Decode(&updatedList)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			allData[i] = updatedList
-			if err := json.NewEncoder(w).Encode(updatedList); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			return
-		}
+	var updatedList ShoppingList
+	err := json.NewDecoder(r.Body).Decode(&updatedList)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-	http.Error(w, "List not found", http.StatusNotFound)
+
+	err = repository.UpdateShoppingList(id, &updatedList)
+	if err != nil {
+		http.Error(w, "List not found", http.StatusNotFound)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(updatedList); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func handlePatchList(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	for i, list := range allData {
-		if strconv.Itoa(list.ID) == id {
-			var patch ShoppingListPatch
-			err := json.NewDecoder(r.Body).Decode(&patch)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			if patch.Name != nil {
-				list.Name = *patch.Name
-			}
-			if patch.Items != nil {
-				list.Items = patch.Items
-			}
-			allData[i] = list
-			err = json.NewEncoder(w).Encode(list)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			return
-		}
+	var patch ShoppingListPatch
+	err := json.NewDecoder(r.Body).Decode(&patch)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	http.Error(w, "List not found", http.StatusNotFound)
+
+	err = repository.PatchShoppingList(id, &patch)
+	if err != nil {
+		http.Error(w, "List not found", http.StatusNotFound)
+		return
+	}
+
+	list, err := repository.GetShoppingList(id)
+	if err != nil {
+		http.Error(w, "List not found", http.StatusNotFound)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(list)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func handleGetList(w http.ResponseWriter, r *http.Request) {

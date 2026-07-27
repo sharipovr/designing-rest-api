@@ -61,7 +61,7 @@ func (r *Repository) GetSession(token string) (*Session, error) {
 
 // Next is the patch method
 func (r *Repository) PatchShoppingList(id string, patch *ShoppingListPatch) error {
-	query := sq.Update("shoping_lists").Where(sq.Eq{"id": id})
+	query := sq.Update("shopping_lists").Where(sq.Eq{"id": id})
 	if patch.Name != nil {
 		query = query.Set("name", *patch.Name)
 	}
@@ -133,5 +133,11 @@ func (r *Repository) DeleteShoppingList(id string) error {
 	return err
 }
 
-// update (put)
+// Update ShoppingList method
+func (r *Repository) UpdateShoppingList(id string, list *ShoppingList) error {
+	query := sq.Update("shopping_lists").Where(sq.Eq{"id": id}).Set("name", list.Name).Set("items", strings.Join(list.Items, ","))
+	_, err := query.RunWith(r.db).Exec()
+	return err
+}
+
 // add item to list
