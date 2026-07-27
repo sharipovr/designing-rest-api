@@ -101,7 +101,12 @@ func handleCreateList(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleListLists(w http.ResponseWriter, r *http.Request) {
-	data, err := json.Marshal(allData)
+	lists, err := repository.GetShoppingLists()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(lists)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -115,14 +120,12 @@ func handleListLists(w http.ResponseWriter, r *http.Request) {
 
 func handleDeleteList(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	for i, list := range allData {
-		if strconv.Itoa(list.ID) == id {
-			allData = append(allData[:i], allData[i+1:]...)
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
+	err := repository.DeleteShoppingList(id)
+	if err != nil {
+		http.Error(w, "List not found", http.StatusNotFound)
+		return
 	}
-	http.Error(w, "List not found", http.StatusNotFound)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func handleUpdateList(w http.ResponseWriter, r *http.Request) {

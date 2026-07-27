@@ -76,7 +76,30 @@ func (r *Repository) PatchShoppingList(id string, patch *ShoppingListPatch) erro
 }
 
 // To do:
-// get all
+// Get all ShoppingLists
+func (r *Repository) GetShoppingLists() ([]ShoppingList, error) {
+	query := sq.Select("id", "name", "items").From("shopping_lists")
+	rows, err := query.RunWith(r.db).Query()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var lists []ShoppingList
+	for rows.Next() {
+		var list ShoppingList
+		var idStr, itemStr string
+		if err := rows.Scan(&idStr, &list.Name, &itemStr); err != nil {
+			return nil, err
+		}
+		list.ID, _ = strconv.Atoi(idStr)
+		if itemStr != "" {
+			list.Items = strings.Split(itemStr, ",")
+		}
+		lists = append(lists, list)
+	}
+	return lists, nil
+}
 
 // Get one ShoppingList
 func (r *Repository) GetShoppingList(id string) (*ShoppingList, error) {
@@ -103,6 +126,12 @@ func (r *Repository) CreateShoppingList(list *ShoppingList) error {
 	return err
 }
 
-// delete
+// Delete ShoppingList.
+func (r *Repository) DeleteShoppingList(id string) error {
+	query := sq.Delete("shopping_lists").Where(sq.Eq{"id": id})
+	_, err := query.RunWith(r.db).Exec()
+	return err
+}
+
 // update (put)
 // add item to list
