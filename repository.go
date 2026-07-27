@@ -77,8 +77,32 @@ func (r *Repository) PatchShoppingList(id string, patch *ShoppingListPatch) erro
 
 // To do:
 // get all
-// get one
-// create
+
+// Get one ShoppingList
+func (r *Repository) GetShoppingList(id string) (*ShoppingList, error) {
+	query := sq.Select("id", "name", "items").From("shopping_lists").Where(sq.Eq{"id": id})
+	row := query.RunWith(r.db).QueryRow()
+
+	var list ShoppingList
+	var idStr, itemStr string
+	if err := row.Scan(&idStr, &list.Name, &itemStr); err != nil {
+		return nil, err
+	}
+	list.ID, _ = strconv.Atoi(idStr)
+	if itemStr != "" {
+		list.Items = strings.Split(itemStr, ",")
+	}
+	return &list, nil
+}
+
+// Create ShoppingList. This a bit different from AddSession, returns only error.
+// This method will be called from handleCreateList as a replacement of chnaging global array approach.
+func (r *Repository) CreateShoppingList(list *ShoppingList) error {
+	query := sq.Insert("shopping_lists").Columns("id", "name", "items").Values(strconv.Itoa(list.ID), list.Name, strings.Join(list.Items, ","))
+	_, err := query.RunWith(r.db).Exec()
+	return err
+}
+
 // delete
 // update (put)
 // add item to list

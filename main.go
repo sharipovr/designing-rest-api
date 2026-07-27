@@ -84,7 +84,14 @@ func handleCreateList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	allData = append(allData, list)
+
+	list.ID = rand.Int()
+	err = repository.CreateShoppingList(&list)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusCreated)
 	err = json.NewEncoder(w).Encode(list)
 	if err != nil {
@@ -169,22 +176,22 @@ func handlePatchList(w http.ResponseWriter, r *http.Request) {
 
 func handleGetList(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	for _, list := range allData {
-		if strconv.Itoa(list.ID) == id {
-			data, err := json.Marshal(list)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			_, err = w.Write(data)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			return
-		}
+	list, err := repository.GetShoppingList(id)
+	if err != nil {
+		http.Error(w, "List not found", http.StatusNotFound)
+		return
 	}
-	http.Error(w, "List not found", http.StatusNotFound)
+
+	data, err := json.Marshal(list)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	_, err = w.Write(data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func handleListPush(w http.ResponseWriter, r *http.Request) {
@@ -219,13 +226,13 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	user := allUsers[data.Username]
 	if user != nil && user.Password == data.Password {
-		token := strconv.Itoa(rand.Intn(100000000000))
-		sessions[token] = &Session{
-			Expires:  time.Now().Add(7 * 24 * time.Hour),
-			Username: user.Username,
+		session, err := repository.AddSession(user.Username)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(w).Encode(map[string]string{"token": token})
+		err = json.NewEncoder(w).Encode(map[string]string{"token": session.Token})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -244,7 +251,7 @@ func authRequired(next http.HandlerFunc) http.HandlerFunc {
 		}
 		token = token[7:]
 		_, err := repository.GetSession(token)
-		if err == nil {
+		if err != nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -256,7 +263,12 @@ func adminRequired(next http.HandlerFunc) http.HandlerFunc {
 	return authRequired(func(w http.ResponseWriter, r *http.Request) {
 		token := r.Header.Get("Authorization")
 		token = token[7:]
-		user := allUsers[sessions[token].Username]
+		session, err := repository.GetSession(token)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		user := allUsers[session.Username]
 		if user.Role != "admin" {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
