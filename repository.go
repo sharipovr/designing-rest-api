@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -140,4 +141,17 @@ func (r *Repository) UpdateShoppingList(id string, list *ShoppingList) error {
 	return err
 }
 
-// add item to list
+// Add item to the ShoppingList method
+func (r *Repository) AddItemToShoppingList(id string, item *ListPushAction) error {
+	list, err := r.GetShoppingList(id)
+	if err != nil {
+		return err
+	}
+	if item.Item == "" {
+		return errors.New("Can not be empty item")
+	}
+
+	list.Items = append(list.Items, item.Item)
+	err = r.UpdateShoppingList(id, list)
+	return err
+}

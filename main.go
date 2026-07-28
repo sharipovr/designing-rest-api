@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -199,25 +198,27 @@ func handleGetList(w http.ResponseWriter, r *http.Request) {
 
 func handleListPush(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	for i, list := range allData {
-		if strconv.Itoa(list.ID) == id {
-			var item ListPushAction
-			err := json.NewDecoder(r.Body).Decode(&item)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			list.Items = append(list.Items, item.Item)
-			allData[i] = list
-			err = json.NewEncoder(w).Encode(list)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			return
-		}
+	var item ListPushAction
+	err := json.NewDecoder(r.Body).Decode(&item)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-	http.Error(w, "List not found", http.StatusNotFound)
+	err = repository.AddItemToShoppingList(id, &item)
+	if err != nil {
+		http.Error(w, "List not found", http.StatusNotFound)
+		return
+	}
+	list, err := repository.GetShoppingList(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = json.NewEncoder(w).Encode(list)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
