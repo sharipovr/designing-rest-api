@@ -1,0 +1,5 @@
+### CORS Preflight Request Example. Allowed instance.
+curl -i -X OPTIONS -H "Access-Control-Request-Method: DELETE" -H "Access-Control-Request-Headers: content-type" -H "Origin: http://localhost:3000" http://localhost:8888/v1/lists/123
+
+### CORS Preflight Request Example. Rejected instance.
+curl -i -X OPTIONS -H "Access-Control-Request-Method: DELETE" -H "Access-Control-Request-Headers: x-made-up-header" -H "Origin: http://localhost:3000" http://localhost:8888/v1/lists/123

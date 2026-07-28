@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/rs/cors"
 )
 
 type ShoppingList struct {
@@ -64,16 +66,36 @@ func main() {
 		os.Exit(1)
 	}
 
-	http.HandleFunc("POST /v1/lists", adminRequired(handleCreateList))
-	http.HandleFunc("GET /v1/lists", authRequired(handleListLists))
-	http.HandleFunc("DELETE /v1/lists/{id}", adminRequired(handleDeleteList))
-	http.HandleFunc("PUT /v1/lists/{id}", adminRequired(handleUpdateList))
-	http.HandleFunc("PATCH /v1/lists/{id}", adminRequired(handlePatchList))
-	http.HandleFunc("GET /v1/lists/{id}", authRequired(handleGetList))
-	http.HandleFunc("POST /v1/lists/{id}/push", adminRequired(handleListPush))
-	http.HandleFunc("POST /login", handleLogin)
+	corsMiddleware := cors.New(cors.Options{
+		AllowedOrigins: []string{"http://localhost:3000"},
+		AllowedMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodPatch,
+			http.MethodOptions,
+		},
+		AllowedHeaders: []string{
+			"Content-Type",
+			"Authorization",
+		},
+		MaxAge: 300,
+	})
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/lists", adminRequired(handleCreateList))
+	mux.HandleFunc("GET /v1/lists", authRequired(handleListLists))
+	mux.HandleFunc("DELETE /v1/lists/{id}", adminRequired(handleDeleteList))
+	mux.HandleFunc("PUT /v1/lists/{id}", adminRequired(handleUpdateList))
+	mux.HandleFunc("PATCH /v1/lists/{id}", adminRequired(handlePatchList))
+	mux.HandleFunc("GET /v1/lists/{id}", authRequired(handleGetList))
+	mux.HandleFunc("POST /v1/lists/{id}/push", adminRequired(handleListPush))
+	mux.HandleFunc("POST /login", handleLogin)
+
+	handler := corsMiddleware.Handler(mux)
 	fmt.Println("listening on port :8888")
-	http.ListenAndServe(":8888", nil)
+	http.ListenAndServe(":8888", handler)
 }
 
 func handleCreateList(w http.ResponseWriter, r *http.Request) {
