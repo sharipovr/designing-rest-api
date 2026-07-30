@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rs/cors"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 type ShoppingList struct {
@@ -17,8 +19,6 @@ type ShoppingList struct {
 	Name  string   `json:"name"`
 	Items []string `json:"items"`
 }
-
-var allData []ShoppingList
 
 type ShoppingListPatch struct {
 	Name  *string  `json:"name"`
@@ -93,9 +93,41 @@ func main() {
 	mux.HandleFunc("POST /v1/lists/{id}/push", adminRequired(handleListPush))
 	mux.HandleFunc("POST /login", handleLogin)
 
-	handler := corsMiddleware.Handler(mux)
-	fmt.Println("listening on port :8888")
-	http.ListenAndServe(":8888", handler)
+	corsHandler := corsMiddleware.Handler(mux)
+
+	env := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+
+	// Run local HTTP unless production is explicitly requested.
+	if env == "" || env == "local" || env == "dev" || env == "development" {
+		fmt.Println("listening on http://localhost:8888")
+		err := http.ListenAndServe(":8888", corsHandler)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
+	certManager := autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist("infotrod.com"),
+		Cache:      autocert.DirCache("certs"),
+	}
+
+	server := &http.Server{
+		Addr:      ":https",
+		Handler:   corsHandler,
+		TLSConfig: certManager.TLSConfig(),
+	}
+
+	go func() {
+		err := http.ListenAndServe(":http", certManager.HTTPHandler(nil))
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	log.Println("listening on https")
+	log.Fatal(server.ListenAndServeTLS("", ""))
 }
 
 func handleCreateList(w http.ResponseWriter, r *http.Request) {
@@ -202,7 +234,7 @@ func handleGetList(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	list, err := repository.GetShoppingList(id)
 	if err != nil {
-		http.Error(w, "List not found", http.StatusNotFound)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
