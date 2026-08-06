@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/rs/cors"
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -50,11 +52,16 @@ var allUsers = map[string]*User{
 	"admin": {"admin", "admin", "password"},
 	"user":  {"user", "user", "password"},
 }
-
+var listCache *lru.Cache[string, ShoppingList]
 var repository *Repository
 
 func main() {
 	var err error
+	listCache, err = lru.New[string, ShoppingList](128)
+	if err != nil {
+		fmt.Println("Unable to initialize the list cache:", err.Error())
+		os.Exit(1)
+	}
 	repository, err = NewRepository("./database.db")
 	if err != nil {
 		fmt.Println("Unable to open the database:", err.Error())
@@ -194,6 +201,7 @@ func handleUpdateList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "List not found", http.StatusNotFound)
 		return
 	}
+	listCache.Remove(id)
 
 	if err := json.NewEncoder(w).Encode(updatedList); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -231,10 +239,18 @@ func handlePatchList(w http.ResponseWriter, r *http.Request) {
 
 func handleGetList(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	list, err := repository.GetShoppingList(id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	list, ok := listCache.Get(id)
+	cacheStatus := "HIT"
+	if !ok {
+		cacheStatus = "MISS"
+		var err error
+		dbList, err := repository.GetShoppingList(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		list = *dbList
+		listCache.Add(id, *dbList)
 	}
 
 	data, err := json.Marshal(list)
@@ -242,6 +258,16 @@ func handleGetList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	w.Header().Set("X-Cache", cacheStatus)
+	w.Header().Set("Cache-Control", "no-cache")
+
+	etag := fmt.Sprintf(`"%x"`, sha256.Sum256(data))
+	if match := r.Header.Get("If-None-Match"); match == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Etag", etag)
 	_, err = w.Write(data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

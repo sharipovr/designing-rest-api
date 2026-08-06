@@ -1,0 +1,33 @@
+# Cache scenarios for chapter 08
+# Run server first: go run .
+# Replace TOKEN and LIST_ID placeholders with real values.
+
+### 2) First GET for a list (expect 200 and Etag header)
+curl -i -X GET http://localhost:8888/v1/lists/6013601240795230277 -H "Authorization: Bearer 2992508506"    
+
+# Copy exact current Etag value from response headers, including quotes.
+# If list content changed, Etag also changes and old value will return 200.
+
+### 3) Client-side cache revalidation with If-None-Match (expect 304)
+curl -i -X GET http://localhost:8888/v1/lists/6013601240795230277 -H "Authorization: Bearer 2992508506" -H 'If-None-Match: "658ef5dbc87549cb075e46d90949d1255dd294b4b7746ca44e6bf2f693944fe4"'
+
+### 4) Server-side cache invalidation via PUT, then Etag changes
+# Update list content (PUT path removes entry from in-memory LRU cache)
+curl -i -X PUT http://localhost:8888/v1/lists/6013601240795230277 \
+-H "Authorization: Bearer 2992508506" \
+-H "Content-Type: application/json" \
+-d '{"name":"updated name","items":["eggs","milk","white bread"]}'
+
+# Request with OLD Etag should now return 200 and a NEW Etag
+curl -i -X GET http://localhost:8888/v1/lists/6013601240795230277 -H "Authorization: Bearer 2992508506" -H 'If-None-Match: "658ef5dbc87549cb075e46d90949d1255dd294b4b7746ca44e6bf2f693944fe4"'
+
+# New Etag value should be copied from response headers for next request.
+ff47d0c8e1932cddfcdfa5f40cf731b387fa19c2900aaf184b11b6ed8f1e028d
+
+### 5) Quick server-side cache hit demo
+# Run these two GETs back to back and check X-Cache response header.
+# Expected: first request X-Cache: MISS, second request X-Cache: HIT.
+curl -i -X GET http://localhost:8888/v1/lists/6013601240795230277 -H "Authorization: Bearer 2992508506"
+curl -i -X GET http://localhost:8888/v1/lists/6013601240795230277 -H "Authorization: Bearer 2992508506"
+
+
