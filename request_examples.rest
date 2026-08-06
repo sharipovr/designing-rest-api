@@ -1,0 +1,26 @@
+# Simple GET to receive list by Id protected with token
+# This one with some old token that is not valid anymore, so it will return 401 Unauthorized
+curl -X GET http://localhost:8888/v1/lists/6013601240795230277 \
+-H "Authorization: Bearer 91962878535"
+
+# Get all lists protected with token
+curl -X GET http://localhost:8888/v1/lists \
+-H "Authorization: Bearer 91962878535"
+
+# Authenticate user as admin and receive token
+curl -i -X POST http://localhost:8888/login \
+-H "Content-Type: application/json" \
+-d '{"username": "admin", "password": "password"}'
+
+# response: {"token":"2992508506"}
+
+curl -i -X POST http://localhost:8888/v1/lists \
+-d '{"id":1, "name":"my first shopping list", "items":["eggs","milk"]}' \
+-H "Authorization: Bearer 91962878535"
+
+curl -i -X DELETE http://localhost:8888/v1/lists/2793795343552378413 \
+-H "Authorization: Bearer 91962878535"
+
+# Get all lists protected with token, this time with valid token
+curl -X GET http://localhost:8888/v1/lists \
+-H "Authorization: Bearer 2992508506"

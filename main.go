@@ -46,7 +46,6 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-var sessions = map[string]*Session{}
 var allUsers = map[string]*User{
 	"admin": {"admin", "admin", "password"},
 	"user":  {"user", "user", "password"},

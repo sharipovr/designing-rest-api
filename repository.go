@@ -51,7 +51,7 @@ func (r *Repository) AddSession(username string) (*Session, error) {
 
 // Next method simply retrieve session
 func (r *Repository) GetSession(token string) (*Session, error) {
-	query := sq.Select("token", "expires", "username").From("sessions").Where(sq.Eq{"token": token}, sq.Gt{"expires": time.Now()})
+	query := sq.Select("token", "expires", "username").From("sessions").Where(sq.Eq{"token": token}).Where(sq.Gt{"expires": time.Now()})
 	row := query.RunWith(r.db).QueryRow()
 	session := Session{}
 	if err := row.Scan(&session.Token, &session.Expires, &session.Username); err != nil {
